@@ -1,0 +1,7 @@
+pyodbc>=5.1.0
+selenium>=4.25.0
+webdriver-manager>=4.0.2
+playwright>=1.49.0
+cryptography>=43.0.0
+requests>=2.32.0
+python-dotenv>=1.0.0
