@@ -83,7 +83,7 @@ export default function App() {
 
   const fetchEmpresas = async () => {
     // Phase 1: Try to load from cache first for immediate feel
-    const cached = localStorage.getItem("sunat_empresas_cache");
+    const cached = localStorage.getItem("sunat_data_v1");
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -99,7 +99,7 @@ export default function App() {
       setEmpresas(data);
       setFiltered(data);
       // Save to cache
-      localStorage.setItem("sunat_empresas_cache", JSON.stringify(data));
+      localStorage.setItem("sunat_data_v1", JSON.stringify(data));
       setStatusMsg(`${data.length} empresa(s) cargadas`, "success");
       setError(null);
     } catch (err) {
@@ -116,7 +116,7 @@ export default function App() {
   // Inicialización de la base de datos y Seguridad
   useEffect(() => {
     // 1. Mostrar caché INMEDIATAMENTE para sensación "flash"
-    const cached = localStorage.getItem("sunat_empresas_cache");
+    const cached = localStorage.getItem("sunat_data_v1");
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
