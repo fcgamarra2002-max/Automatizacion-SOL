@@ -16,27 +16,8 @@ logger = logging.getLogger(__name__)
 # Configuración de contraseña de la base de datos Access
 DB_PASSWORD = os.environ.get("SUNAT_DB_PASSWORD", "sunat_secure_2026")
 
-# Datos de prueba (las claves aquí son ficticias)
-DATOS_PRUEBA = [
-    {
-        "RUC": "20100130204",
-        "RazonSocial": "EMPRESA DEMO S.A.C.",
-        "UsuarioSOL": "DEMOSOL1",
-        "ClaveSOL": "demo1234",
-        "Navegador": "chrome",
-        "TipoPortal": "TRAMITES",
-        "Motor": "selenium",
-    },
-    {
-        "RUC": "20456789012",
-        "RazonSocial": "COMERCIAL LIMA PERÚ E.I.R.L.",
-        "UsuarioSOL": "COMLIMA1",
-        "ClaveSOL": "lima5678",
-        "Navegador": "edge",
-        "TipoPortal": "CONSULTAS",
-        "Motor": "playwright",
-    },
-]
+# Datos de prueba (Vaciados para producción)
+DATOS_PRUEBA = []
 
 
 def create_access_db(db_path: str, password: str = None) -> bool:

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Clave SOL - SUNAT",
+  "productName": "Automatizacion-SOL",
   "version": "0.1.0",
   "identifier": "com.sunat.automation.v1",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Clave SOL - SUNAT",
+        "title": "Automatizacion-SOL",
         "width": 1000,
         "height": 600,
         "center": true,
@@ -28,10 +28,16 @@
     "targets": [
       "nsis"
     ],
+    "licenseFile": "LICENSE.txt",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "languages": [
+          "Spanish"
+        ],
+        "headerImage": "installer_banner.png",
+        "sidebarImage": "installer_banner.png"
       }
     },
     "resources": [
@@ -56,7 +62,7 @@
         "installMode": "passive"
       },
       "endpoints": [
-        "https://raw.githubusercontent.com/TU-USUARIO/TU-REPOSITORIO/main/update.json"
+        "https://raw.githubusercontent.com/fcgamarra2002-max/Automatizacion-SOL/master/update.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIHB1YmxpYyBrZXkKUlNSVFkwSXlyM2xhZjVSUzlkaU1FbTRrRk9qR29oYmJkNkWUhPaGpwak85V0dJbldmMDgK"
     }

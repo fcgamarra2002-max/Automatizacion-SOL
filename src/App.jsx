@@ -49,34 +49,37 @@ export default function App() {
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
   const toggleTheme = () => setTheme(prev => prev === "dark" ? "light" : "dark");
 
-  useEffect(() => {
-    async function checkForUpdates() {
-      try {
-        const update = await check();
-        if (update?.available) {
-          setUpdateAvailable(true);
-          const yes = await ask(`Actualización a ${update.version} disponible!\n\nNotas de la versión:\n${update.body}`, {
-            title: 'Actualización de SUNAT Automation',
-            kind: 'info',
-            okLabel: 'Actualizar y Reiniciar',
-            cancelLabel: 'Más tarde'
-          });
-          if (yes) {
-            await update.downloadAndInstall();
-            await relaunch();
-          }
+  const handleManualUpdate = async () => {
+    setLoading(true);
+    setStatusMsg("Buscando actualizaciones...", "info");
+    try {
+      const update = await check();
+      if (update?.available) {
+        setUpdateAvailable(true);
+        const yes = await ask(`Actualización a ${update.version} disponible!\n\nNotas de la versión:\n${update.body}`, {
+          title: 'Actualización de SUNAT Automation',
+          kind: 'info',
+          okLabel: 'Actualizar y Reiniciar',
+          cancelLabel: 'Más tarde'
+        });
+        if (yes) {
+          setStatusMsg("Descargando actualización...", "info");
+          await update.downloadAndInstall();
+          await relaunch();
+        } else {
+          setStatusMsg("Actualización pospuesta", "info");
         }
-      } catch (error) {
-        console.error("Error al buscar actualizaciones:", error);
+      } else {
+        setStatusMsg("La aplicación está actualizada", "success");
+        await tauriMessage("Ya tienes la última versión instalada.", { title: "Sin actualizaciones", kind: "info" });
       }
+    } catch (error) {
+      console.error("Error al buscar actualizaciones:", error);
+      setStatusMsg("Error al buscar actualizaciones", "error");
+    } finally {
+      setLoading(false);
     }
-    checkForUpdates();
-  }, []);
-
-  const DEMO_DATA = [
-    { Id: 1, RUC: "20486809761", RazonSocial: "MULTISERVICIOS VILLALVA II E.I.R.L.", UsuarioSOL: "RONELLIC", Estado: "Activo" },
-    { Id: 2, RUC: "20456789012", RazonSocial: "COMERCIAL LOS ANDES S.A.C.", UsuarioSOL: "JUANPE", Estado: "Activo" },
-  ];
+  };
 
   const fetchEmpresas = async () => {
     // Phase 1: Try to load from cache first for immediate feel
@@ -101,9 +104,9 @@ export default function App() {
       setError(null);
     } catch (err) {
       if (!cached) {
-        setEmpresas(DEMO_DATA);
-        setFiltered(DEMO_DATA);
-        setStatusMsg("Modo demo — conecte el sidecar para datos reales", "info");
+        setEmpresas([]);
+        setFiltered([]);
+        setStatusMsg("No se encontraron datos registrados.", "info");
       }
     } finally {
       setLoading(false);
@@ -328,7 +331,7 @@ export default function App() {
               className="detailLogoImage"
               style={{ height: '28px', width: 'auto' }}
             />
-            Clave SOL - SUNAT
+            Automatizacion-SOL
           </h1>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div className="tooltip-wrapper" data-tooltip="Restaurar Backup (.zip)">
@@ -364,14 +367,30 @@ export default function App() {
               <div className="tooltip-wrapper" data-tooltip="Actualización disponible">
                 <button
                   className="btn"
-                  onClick={() => check()} // Re-check or potentially trigger the prompt again
+                  onClick={handleManualUpdate}
                   style={{
                     borderRadius: '50%',
                     display: 'flex',
-                    background: 'var(--accent-color)',
-                    color: 'white',
+                    background: updateAvailable ? 'var(--accent-color)' : 'transparent',
+                    color: updateAvailable ? 'white' : 'inherit',
                     padding: '6px',
-                    animation: 'pulse 2s infinite'
+                    animation: updateAvailable ? 'pulse 2s infinite' : 'none'
+                  }}
+                >
+                  <IconUpdate width={16} height={16} />
+                </button>
+              </div>
+            )}
+
+            {!updateAvailable && (
+              <div className="tooltip-wrapper" data-tooltip="Buscar actualizaciones">
+                <button
+                  className="btn"
+                  onClick={handleManualUpdate}
+                  style={{
+                    borderRadius: '50%',
+                    display: 'flex',
+                    padding: '6px'
                   }}
                 >
                   <IconUpdate width={16} height={16} />

@@ -1,0 +1,11 @@
+﻿CONTRATO DE LICENCIA DE USUARIO FINAL (EULA) PARA AUTOMATIZACION-SOL
+
+1. LICENCIA: Se le otorga una licencia limitada e intransferible para usar este software con fines de automatización de trámites tributarios.
+
+2. RECURSOS: El software utiliza automatización de navegador para interactuar con portales externos. El usuario es responsable de proporcionar credenciales válidas y cumplir con los términos de dichos portales.
+
+3. PRIVACIDAD: Los datos se almacenan localmente en su equipo. La aplicación no recolecta ni envía información sensible a servidores externos, salvo para la verificación de actualizaciones.
+
+4. RESPONSABILIDAD: El software se proporciona "tal cual". Los desarrolladores no se hacen responsables por errores en los trámites derivados del uso incorrecto de la herramienta.
+
+Al continuar con la instalación, usted acepta estos términos.
