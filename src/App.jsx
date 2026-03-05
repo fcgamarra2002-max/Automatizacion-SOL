@@ -11,7 +11,8 @@ import {
   deleteEmpresa,
   loginSunat,
   initDatabase,
-  spawnSidecar
+  spawnSidecar,
+  stopServer
 } from "./services/tauriService";
 import EmpresaCard from "./components/EmpresaCard";
 import EmpresaForm from "./components/EmpresaForm";
@@ -284,8 +285,12 @@ export default function App() {
       if (!confirmRestore) return;
 
       setLoading(true);
-      setStatusMsg("Restaurando base de datos...", "info");
+      setStatusMsg("Cerrando servicios de base de datos...", "info");
 
+      // 1. Detener el sidecar para liberar el bloqueo de archivo de Access
+      await stopServer();
+
+      setStatusMsg("Restaurando base de datos...", "info");
       const msg = await invoke("import_backup", { srcPath: selectedPath });
       setStatusMsg(msg, "success");
 

@@ -93,10 +93,10 @@ fn import_backup(src_path: String) -> Result<String, String> {
         // Extraer y sobrescribir accdb
         if file.name() == "empresas.accdb" {
             let mut out = File::create(&db_file).map_err(|e| {
-                format!("Error creando/sobrescribiendo empresas.accdb local: {}", e)
+                format!("Error al sobrescribir empresas.accdb (¿Archivo bloqueado?): {}", e)
             })?;
             std::io::copy(&mut file, &mut out)
-                .map_err(|e| format!("Error extrayendo empresas.accdb: {}", e))?;
+                .map_err(|e| format!("Error extrayendo datos a empresas.accdb: {}", e))?;
             found_db = true;
         }
 

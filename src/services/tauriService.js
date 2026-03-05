@@ -12,6 +12,7 @@ import { appLocalDataDir, join, resolveResource } from "@tauri-apps/api/path";
 
 const SIDECAR = "binaries/sunat-sidecar";
 let DB_PATH = "data/empresas.accdb"; // Fallback inicial
+let sidecarReady = false;
 
 // ── Estado global del servidor persistente ──
 const pending = new Map();
@@ -51,6 +52,7 @@ async function getServer() {
             // Mensaje de "server ready" — ignorar
             if (obj.server === "ready") {
                 console.log("[sidecar] Servidor listo.");
+                sidecarReady = true;
                 return;
             }
 
@@ -83,6 +85,7 @@ async function getServer() {
         }
         pending.clear();
         server = null;
+        sidecarReady = false;
     });
 
     return server;
@@ -114,6 +117,25 @@ async function runSidecar(args) {
             }
         }, 90000);
     });
+}
+
+/**
+ * Detener el servidor persistente manualmente.
+ * Útil antes de operaciones de archivo (como Restore) que requieren que la DB no esté bloqueada.
+ */
+export async function stopServer() {
+    if (server && server.child) {
+        console.log("[sidecar] Deteniendo servidor...");
+        try {
+            await server.child.kill();
+        } catch (e) {
+            console.warn("[sidecar] Error al aplicar kill:", e);
+        }
+        server = null;
+        sidecarReady = false;
+        // Pequeña espera para asegurar que el SO libere el archivo
+        await new Promise(r => setTimeout(r, 500));
+    }
 }
 
 // ── Almacén para procesos activos de login ──
