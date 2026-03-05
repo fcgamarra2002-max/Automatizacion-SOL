@@ -89,7 +89,7 @@ export default function App() {
         const parsed = JSON.parse(cached);
         setEmpresas(parsed);
         setFiltered(parsed);
-      } catch (e) { console.error("Cache error", e); }
+      } catch (e) { console.error("Error de caché", e); }
     }
 
     setLoading(true);
@@ -122,7 +122,7 @@ export default function App() {
         const parsed = JSON.parse(cached);
         setEmpresas(parsed);
         setFiltered(parsed);
-      } catch (e) { console.error("Cache error", e); }
+      } catch (e) { console.error("Error de caché", e); }
     }
 
     const startApp = async () => {

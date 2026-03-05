@@ -166,7 +166,7 @@ export default function EmpresaForm({ empresa, onClose, onSaved, setStatus }) {
 
     try {
       const res = await consultarRuc(ruc);
-      console.log("RUC result:", res);
+      console.log("Resultado RUC:", res);
 
       if (res.success) {
         const nombre = res.RazonSocial || res.razon_social || "";
@@ -186,7 +186,7 @@ export default function EmpresaForm({ empresa, onClose, onSaved, setStatus }) {
         showMsg(res.message || "RUC no encontrado", "error");
       }
     } catch (err) {
-      console.error("RUC error:", err);
+      console.error("Error RUC:", err);
       showMsg(`Error: ${err.message}`, "error");
     } finally {
       setSearching(false);

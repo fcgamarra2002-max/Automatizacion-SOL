@@ -38,8 +38,8 @@ export default function Sidebar({ searchText, onSearchChange, theme, onToggleThe
                 <div className="sidebar-brand">
                     <div className="brand-icon"><IconShield width={14} height={14} /></div>
                     <div>
-                        <div className="brand-name">SUNAT Automation</div>
-                        <div className="brand-version">v1.0.0</div>
+                        <div className="brand-name">Automatizacion-SOL</div>
+                        <div className="brand-version">v0.1.1</div>
                     </div>
                 </div>
                 <a className="nav-item" href="#" onClick={(e) => { e.preventDefault(); onToggleTheme(); }}>
