@@ -18,23 +18,51 @@ logger = logging.getLogger(__name__)
 DB_PASSWORD = os.environ.get("SUNAT_DB_PASSWORD", "sunat_secure_2026")
 
 def get_connection(db_path: str):
-    """Establecer conexión con la DB MS Access."""
-    # Asegurar que la ruta sea absoluta y normalizada para Windows
+    """Establecer conexión con la DB MS Access buscando el controlador disponible."""
     full_path = os.path.abspath(db_path)
     if not os.path.exists(full_path):
         logger.error(f"Base de datos no encontrada en: {full_path}")
         raise FileNotFoundError(f"No se encontró el archivo de base de datos en: {full_path}")
 
+    # Buscar controladores instalados que soporten Access
+    all_drivers = [d for d in pyodbc.drivers()]
+    # Prioridad: ACE (accdb) > Access (mdb)
+    target_driver = None
+    for d in all_drivers:
+        if "Microsoft Access Driver (*.mdb, *.accdb)" in d:
+            target_driver = d
+            break
+    
+    if not target_driver:
+        for d in all_drivers:
+            if "Microsoft Access" in d and "*.mdb" in d:
+                target_driver = d
+                break
+
+    if not target_driver:
+        error_msg = (
+            "No se encontró el controlador ODBC de Microsoft Access (32 bits).\n\n"
+            "Por favor, descargue e instale 'Microsoft Access Database Engine 2016' (versión x86) "
+            "desde el sitio oficial de Microsoft:\n"
+            "https://www.microsoft.com/en-us/download/details.aspx?id=54920\n\n"
+            "Nota: Seleccione 'accessdatabaseengine.exe' (32 bits) para compatibilidad."
+        )
+        logger.error(error_msg)
+        raise pyodbc.Error("IM002", error_msg)
+
     try:
         conn_str = (
-            r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};"
+            f"DRIVER={{{target_driver}}};"
             f"DBQ={full_path};"
             f"PWD={DB_PASSWORD};"
         )
-        logger.info(f"Conectando a DB: {full_path}")
+        logger.info(f"Conectando usando driver: {target_driver}")
         return pyodbc.connect(conn_str, autocommit=True)
     except pyodbc.Error as e:
-        logger.error(f"Error ODBC al conectar a {full_path}: {e}")
+        logger.error(f"Error ODBC al conectar: {e}")
+        # Message extra si es el error de arquitectura
+        if "IM002" in str(e):
+            raise pyodbc.Error("IM002", "Driver no encontrado. Instale Microsoft Access Database Engine (x86).")
         raise
 
 

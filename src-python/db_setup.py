@@ -45,11 +45,27 @@ def create_access_db(db_path: str, password: str = None) -> bool:
 
 
 def get_db_connection(db_path: str, password: str = None):
-    """Establece conexión con la base de datos Access."""
+    """Establece conexión con la base de datos Access buscando el controlador."""
     try:
-        driver = "{Microsoft Access Driver (*.mdb, *.accdb)}"
+        # Buscar controladores instalados
+        all_drivers = [d for d in pyodbc.drivers()]
+        target_driver = None
+        for d in all_drivers:
+            if "Microsoft Access Driver (*.mdb, *.accdb)" in d:
+                target_driver = d
+                break
+        if not target_driver:
+            for d in all_drivers:
+                if "Microsoft Access" in d and "*.mdb" in d:
+                    target_driver = d
+                    break
+
+        if not target_driver:
+            logger.error("No se encontró controlador ODBC de Access.")
+            return None
+
         # Connection string con soporte para contraseña
-        conn_str = f"DRIVER={driver};DBQ={db_path};"
+        conn_str = f"DRIVER={{{target_driver}}};DBQ={db_path};"
         if password:
             conn_str += f"PWD={password};"
             
