@@ -41,11 +41,13 @@ def get_connection(db_path: str):
 
     if not target_driver:
         error_msg = (
-            "No se encontró el controlador ODBC de Microsoft Access (32 bits).\n\n"
-            "Por favor, descargue e instale 'Microsoft Access Database Engine 2016' (versión x86) "
-            "desde el sitio oficial de Microsoft:\n"
-            "https://www.microsoft.com/en-us/download/details.aspx?id=54920\n\n"
-            "Nota: Seleccione 'accessdatabaseengine.exe' (32 bits) para compatibilidad."
+            "⚠️ ERROR DE CONTROLADOR (32-BITS) ⚠️\n\n"
+            "La aplicación es de 32 bits y NO encuentra el driver 'Microsoft Access Driver (*.mdb, *.accdb)'.\n\n"
+            "SOLUCIÓN:\n"
+            "1. Vaya a: https://www.microsoft.com/en-us/download/details.aspx?id=54920\n"
+            "2. IMPORTANTE: Descargue el archivo 'accessdatabaseengine.exe' (EL DE 32 BITS).\n"
+            "3. NO use 'accessdatabaseengine_X64.exe' aunque su computadora sea de 64 bits.\n\n"
+            "Si ya instaló uno, desinstálelo e instale el de 32 bits (x86)."
         )
         logger.error(error_msg)
         raise pyodbc.Error("IM002", error_msg)
