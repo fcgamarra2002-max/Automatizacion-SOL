@@ -282,10 +282,16 @@ export async function initDatabase() {
 
         // 3. Ejecutar el comando de setup del sidecar DE FORMA INDEPENDIENTE (one-shot)
         // Usamos un comando nuevo para no interferir con el servidor persistente durante el boot
-        console.log("[db] Ejecutando setupDatabase inicial (one-shot)...");
+        console.log("[db] Ejecutando setupDatabase inicial (one-shot) en AppData...");
         const setupResult = await setupDatabaseOneShot(cleanDbPath);
         console.log("[db] Setup inicial completado:", setupResult);
 
+        // 4. Verificación final de persistencia
+        if (!(await exists(finalDbPath))) {
+            throw new Error(`Fallo crítico: La base de datos no se pudo crear en ${finalDbPath}`);
+        }
+
+        console.log("[db] Inicialización exitosa y persistente en AppData.");
         return { success: true };
     } catch (error) {
         console.error("[db] Error CRÍTICO en initDatabase:", error);

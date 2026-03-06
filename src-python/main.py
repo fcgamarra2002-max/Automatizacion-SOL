@@ -40,12 +40,17 @@ logger = logging.getLogger("sunat-sidecar")
 
 def resolve_db_path(db_arg: str) -> str:
     """Resolver la ruta de la base de datos a ruta absoluta y sugerir el directorio a crypto."""
-    # Limpiar prefijos de rutas extendidas de Windows que pueden venir de Tauri/SO
+    # Limpiar prefijos de rutas extendidas de Windows
     db_clean = db_arg.replace("\\\\?\\", "").replace("//?/", "")
     full_path = os.path.abspath(db_clean) if not os.path.isabs(db_clean) else db_clean
     
     db_dir = os.path.dirname(full_path)
-    if os.path.exists(db_dir):
+    # IMPORTANTE: Asegurar que el directorio existe para evitar "FileNotFoundError"
+    if db_dir and not os.path.exists(db_dir):
+        try: os.makedirs(db_dir, exist_ok=True)
+        except: pass
+
+    if db_dir and os.path.exists(db_dir):
         from crypto import set_key_search_dir
         set_key_search_dir(db_dir)
     return full_path
