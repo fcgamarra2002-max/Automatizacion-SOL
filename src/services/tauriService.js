@@ -240,9 +240,10 @@ export async function initDatabase() {
         const dataDir = await appLocalDataDir();
         const dbDir = await join(dataDir, "data");
         const finalDbPath = await join(dbDir, "empresas.db");
-        const masterKeyPath = await join(dbDir, "master.key");
 
-        console.log("[db] AppData path:", finalDbPath);
+        // Limpiar prefijos \\?\ que confunden a Python
+        const cleanDbPath = finalDbPath.replace("\\\\?\\", "").replace("//?/", "");
+        console.log("[db] Path normalizado para Python:", cleanDbPath);
 
         // 1. Asegurar que la carpeta existe
         if (!(await exists(dbDir))) {
@@ -250,7 +251,7 @@ export async function initDatabase() {
             await mkdir(dbDir, { recursive: true });
         }
 
-        // 2. Si la DB no existe, intentar copiar desde recursos o dejar que el sidecar la cree
+        // 2. Si la DB no existe, intentar copiar desde recursos
         if (!(await exists(finalDbPath))) {
             console.log("[db] DB no encontrada en AppData. Buscando en recursos...");
 
@@ -277,17 +278,48 @@ export async function initDatabase() {
             console.log("[db] DB ya existe en AppData.");
         }
 
-        DB_PATH = finalDbPath;
+        DB_PATH = cleanDbPath;
 
-        // Ejecutar el comando de setup del sidecar para asegurar tablas/contraseña
-        console.log("[db] Ejecutando setupDatabase en sidecar...");
-        const response = await setupDatabase();
-        console.log("[db] Setup completado:", response);
-        return response;
+        // 3. Ejecutar el comando de setup del sidecar DE FORMA INDEPENDIENTE (one-shot)
+        // Usamos un comando nuevo para no interferir con el servidor persistente durante el boot
+        console.log("[db] Ejecutando setupDatabase inicial (one-shot)...");
+        const setupResult = await setupDatabaseOneShot(cleanDbPath);
+        console.log("[db] Setup inicial completado:", setupResult);
+
+        return { success: true };
     } catch (error) {
         console.error("[db] Error CRÍTICO en initDatabase:", error);
         throw error;
     }
+}
+
+/**
+ * Ejecuta el setup de la base de datos usando un proceso sidecar independiente.
+ * Esto es más seguro durante el arranque que usar el servidor compartido.
+ */
+async function setupDatabaseOneShot(path) {
+    return new Promise((resolve, reject) => {
+        const cmd = Command.sidecar(SIDECAR, ["setup-db", "--db", path]);
+
+        let output = "";
+        cmd.stdout.on("data", line => { output += line; });
+        cmd.stderr.on("data", line => console.warn("[setup-db] stderr:", line));
+
+        cmd.on("close", data => {
+            if (data.code === 0) {
+                try {
+                    resolve(JSON.parse(output));
+                } catch (e) {
+                    resolve({ success: true, message: "Setup finalizado (no-json output)" });
+                }
+            } else {
+                reject(new Error(`Setup falló con código ${data.code}`));
+            }
+        });
+
+        cmd.on("error", error => reject(error));
+        cmd.spawn().catch(reject);
+    });
 }
 
 export async function setupDatabase() {

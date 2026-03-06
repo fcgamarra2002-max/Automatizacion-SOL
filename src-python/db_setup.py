@@ -112,38 +112,50 @@ def insert_test_data(conn) -> bool:
 
 def setup_all(db_path: str):
     """Orquestador completo: DB -> Tablas -> Datos Prueba"""
-    # Asegurar que existe la clave maestra en la misma carpeta que la DB
-    db_dir = os.path.dirname(db_path)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-    
-    # Notificar a crypto dónde buscar la llave ANTES de proceder
-    from crypto import set_key_search_dir
-    if db_dir:
-        set_key_search_dir(db_dir)
-        
-    key_file = os.path.join(db_dir, "master.key")
-    if not os.path.exists(key_file):
-        save_key_to_file(key_file)
-        logger.info(f"Clave maestra generada en: {key_file}")
-
-    if not create_sqlite_db(db_path):
-        return False
-        
-    conn = get_db_connection(db_path)
-    if not conn:
-        return False
-        
     try:
-        if not create_tables(conn):
-            return False
-        if not insert_test_data(conn):
+        # Asegurar que existe la carpeta
+        db_path = os.path.abspath(db_path)
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        
+        # Notificar a crypto dónde buscar la llave ANTES de proceder
+        from crypto import set_key_search_dir
+        if db_dir:
+            set_key_search_dir(db_dir)
+            
+        key_file = os.path.join(db_dir, "master.key")
+        if not os.path.exists(key_file):
+            logger.info("Generando nueva llave maestra...")
+            save_key_to_file(key_file)
+            # Verificar que se creó
+            if not os.path.exists(key_file):
+                logger.error("No se pudo crear el archivo master.key")
+                return False
+            logger.info(f"Clave maestra generada exitosamente en: {key_file}")
+        else:
+            logger.info(f"Usando clave maestra existente en: {key_file}")
+
+        if not create_sqlite_db(db_path):
             return False
             
-        logger.info("Setup de base de datos SQLite completado exitosamente.")
-        return True
-    finally:
-        conn.close()
+        conn = get_db_connection(db_path)
+        if not conn:
+            return False
+            
+        try:
+            if not create_tables(conn):
+                return False
+            if not insert_test_data(conn):
+                return False
+                
+            logger.info("Setup de base de datos SQLite completado exitosamente.")
+            return True
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"Error crítico en setup_all: {e}")
+        return False
 
 
 if __name__ == "__main__":
