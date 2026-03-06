@@ -30,14 +30,14 @@ def create_access_db(db_path: str, password: str = None) -> bool:
         import win32com.client
         catalog = win32com.client.Dispatch("ADOX.Catalog")
         
-        # Connection string con soporte para contraseña
-        conn_str = f"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={db_path};"
+        # Connection string para Jet 4.0 (nativo de Windows para .mdb)
+        conn_str = f"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={db_path};"
         if password:
             conn_str += f"Jet OLEDB:Database Password={password};"
             
         catalog.Create(conn_str)
         catalog = None
-        logger.info(f"Base de datos creada exitosamente en: {db_path}")
+        logger.info(f"Base de datos .mdb creada exitosamente en: {db_path}")
         return True
     except Exception as e:
         logger.error(f"Error al crear la base de datos: {e}")
@@ -50,18 +50,22 @@ def get_db_connection(db_path: str, password: str = None):
         # Buscar controladores instalados
         all_drivers = [d for d in pyodbc.drivers()]
         target_driver = None
+        
+        # Priorizar Driver de Access antiguo para .mdb
         for d in all_drivers:
-            if "Microsoft Access Driver (*.mdb, *.accdb)" in d:
+            if "Microsoft Access Driver (*.mdb)" in d:
                 target_driver = d
                 break
+        
         if not target_driver:
+            # Fallback a cualquier driver de Access
             for d in all_drivers:
-                if "Microsoft Access" in d and "*.mdb" in d:
+                if "Microsoft Access" in d:
                     target_driver = d
                     break
 
         if not target_driver:
-            logger.error("No se encontró controlador ODBC de Access.")
+            logger.error("No se encontró controlador ODBC de Access (necesario para .mdb).")
             return None
 
         # Connection string con soporte para contraseña
@@ -184,6 +188,6 @@ def setup_all(db_path: str):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     db = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-        os.path.dirname(__file__), "..", "data", "empresas.accdb"
+        os.path.dirname(__file__), "..", "data", "empresas.mdb"
     )
     setup_all(os.path.abspath(db))

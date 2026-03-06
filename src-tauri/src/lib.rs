@@ -15,11 +15,11 @@ fn export_backup(dest_path: String) -> Result<String, String> {
         .iter()
         .collect();
 
-    let db_file = db_dir.join("empresas.accdb");
+    let db_file = db_dir.join("empresas.mdb");
     let key_file = db_dir.join("master.key");
 
     if !db_file.exists() {
-        return Err("Error: La base de datos (empresas.accdb) no existe.".into());
+        return Err("Error: La base de datos (empresas.mdb) no existe.".into());
     }
 
     // Preparar el archivo ZIP de destino
@@ -30,11 +30,11 @@ fn export_backup(dest_path: String) -> Result<String, String> {
 
     let options = FileOptions::<()>::default()
         .compression_method(zip::CompressionMethod::Deflated)
-        .unix_permissions(0o755); // Opcional, pero buena práctica
+        .unix_permissions(0o755);
 
     // 1. Añadir la base de datos
-    zip.start_file("empresas.accdb", options)
-        .map_err(|e| format!("Error iniciando entrada ZIP para accdb: {}", e))?;
+    zip.start_file("empresas.mdb", options)
+        .map_err(|e| format!("Error iniciando entrada ZIP para mdb: {}", e))?;
 
     let mut f = File::open(&db_file).map_err(|e| format!("Error abriendo base de datos: {}", e))?;
     let mut buffer = Vec::new();
@@ -72,7 +72,7 @@ fn import_backup(src_path: String) -> Result<String, String> {
         .iter()
         .collect();
 
-    let db_file = db_dir.join("empresas.accdb");
+    let db_file = db_dir.join("empresas.mdb");
     let key_file = db_dir.join("master.key");
 
     // Abrir el archivo ZIP de origen
@@ -90,17 +90,17 @@ fn import_backup(src_path: String) -> Result<String, String> {
             .by_index(i)
             .map_err(|e| format!("Error accediendo a archivo interno del ZIP: {}", e))?;
 
-        // Extraer y sobrescribir accdb
-        if file.name() == "empresas.accdb" {
+        // Extraer y sobrescribir mdb
+        if file.name() == "empresas.mdb" || file.name() == "empresas.accdb" {
             let mut out = File::create(&db_file).map_err(|e| {
-                format!("Error al sobrescribir empresas.accdb (¿Archivo bloqueado?): {}", e)
+                format!("Error al sobrescribir empresas.mdb (¿Archivo bloqueado?): {}", e)
             })?;
             std::io::copy(&mut file, &mut out)
-                .map_err(|e| format!("Error extrayendo datos a empresas.accdb: {}", e))?;
+                .map_err(|e| format!("Error extrayendo datos a empresas.mdb: {}", e))?;
             found_db = true;
         }
 
-        // Extraer y sobrescribir master.key (opcional en backups antiguos)
+        // Extraer y sobrescribir master.key
         if file.name() == "master.key" {
             let mut out = File::create(&key_file)
                 .map_err(|e| format!("Error creando/sobrescribiendo master.key local: {}", e))?;
@@ -111,7 +111,7 @@ fn import_backup(src_path: String) -> Result<String, String> {
 
     if !found_db {
         return Err(
-            "El archivo ZIP seleccionado no contiene una copia válida de empresas.accdb.".into(),
+            "El archivo ZIP seleccionado no contiene una copia válida de la base de datos.".into(),
         );
     }
 
@@ -131,15 +131,15 @@ pub fn run() {
         .setup(|app| {
             if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
                 let db_dir: PathBuf = [&local_app_data, "com.sunat.automation.v1", "data"].iter().collect();
-                let db_file = db_dir.join("empresas.accdb");
+                let db_file = db_dir.join("empresas.mdb");
                 
                 if !db_file.exists() {
                     let _ = std::fs::create_dir_all(&db_dir);
-                    if let Ok(resource_path) = app.path().resolve("data/plantilla.accdb", tauri::path::BaseDirectory::Resource) {
+                    if let Ok(resource_path) = app.path().resolve("data/plantilla.mdb", tauri::path::BaseDirectory::Resource) {
                         if let Err(e) = std::fs::copy(&resource_path, &db_file) {
                             eprintln!("Error auto-generating blank database: {}", e);
                         } else {
-                            println!("Blank database successfully deployed to AppData for first-time use.");
+                            println!("Blank database (.mdb) successfully deployed to AppData for first-time use.");
                         }
                     }
                 }

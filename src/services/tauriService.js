@@ -11,7 +11,7 @@ import { exists, copyFile, mkdir, BaseDirectory } from "@tauri-apps/plugin-fs";
 import { appLocalDataDir, join, resolveResource } from "@tauri-apps/api/path";
 
 const SIDECAR = "binaries/sunat-sidecar";
-let DB_PATH = "data/empresas.accdb"; // Fallback inicial
+let DB_PATH = "data/empresas.mdb"; // Fallback inicial
 let sidecarReady = false;
 
 // ── Estado global del servidor persistente ──
