@@ -39,10 +39,13 @@ logger = logging.getLogger("sunat-sidecar")
 
 
 def resolve_db_path(db_arg: str) -> str:
-    """Resolver la ruta de la base de datos a ruta absoluta."""
-    if os.path.isabs(db_arg):
-        return db_arg
-    return os.path.abspath(db_arg)
+    """Resolver la ruta de la base de datos a ruta absoluta y sugerir el directorio a crypto."""
+    full_path = os.path.abspath(db_arg) if not os.path.isabs(db_arg) else db_arg
+    db_dir = os.path.dirname(full_path)
+    if os.path.exists(db_dir):
+        from crypto import set_key_search_dir
+        set_key_search_dir(db_dir)
+    return full_path
 
 
 def cmd_list_empresas(args):

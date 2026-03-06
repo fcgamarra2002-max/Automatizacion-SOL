@@ -15,6 +15,12 @@ from cryptography.fernet import Fernet
 _KEY_FILE_ENV = "SUNAT_MASTER_KEY"
 _KEY_FILE_PATH_ENV = "SUNAT_KEY_FILE"
 IN_MEMORY_KEY = None
+_SEARCH_DIR_HINT = None
+
+def set_key_search_dir(path: str):
+    """Sugerir un directorio donde buscar la llave (ej. el dircotorio de la DB)."""
+    global _SEARCH_DIR_HINT
+    _SEARCH_DIR_HINT = path
 
 
 def generate_key() -> str:
@@ -61,6 +67,11 @@ def get_master_key() -> bytes:
     key_file_path_env = os.environ.get(_KEY_FILE_PATH_ENV)
     if key_file_path_env:
         candidates.append(key_file_path_env)
+
+    # 4. Prioridad: Directorio sugerido (Hint)
+    if _SEARCH_DIR_HINT:
+        candidates.append(os.path.join(_SEARCH_DIR_HINT, "master.key"))
+        candidates.append(os.path.join(os.path.dirname(_SEARCH_DIR_HINT), "master.key"))
 
     # 4. Prioridad: Carpeta de datos de la aplicación (LOCALAPPDATA en Windows)
     app_data = os.environ.get('LOCALAPPDATA')
