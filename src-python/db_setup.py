@@ -116,6 +116,11 @@ def setup_all(db_path: str):
     db_dir = os.path.dirname(db_path)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
+    
+    # Notificar a crypto dónde buscar la llave ANTES de proceder
+    from crypto import set_key_search_dir
+    if db_dir:
+        set_key_search_dir(db_dir)
         
     key_file = os.path.join(db_dir, "master.key")
     if not os.path.exists(key_file):

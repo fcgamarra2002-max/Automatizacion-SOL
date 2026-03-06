@@ -76,6 +76,9 @@ def get_master_key() -> bytes:
     # 4. Prioridad: Carpeta de datos de la aplicación (LOCALAPPDATA en Windows)
     app_data = os.environ.get('LOCALAPPDATA')
     if app_data:
+        # Rutas comunes para esta aplicación
+        candidates.append(os.path.join(app_data, "Automatizacion-SOL", "data", "master.key"))
+        candidates.append(os.path.join(app_data, "Automatizacion-SOL", "master.key"))
         candidates.append(os.path.join(app_data, "com.sunat.automation.v1", "data", "master.key"))
 
     # 5. Búsqueda en directorios relativos y hacia arriba
@@ -107,7 +110,15 @@ def get_master_key() -> bytes:
             unique_candidates.append(c)
             seen.add(c)
 
-    for path in unique_candidates:
+    # Normalizar y limpiar candidatos
+    final_candidates = []
+    for c in unique_candidates:
+        if not c: continue
+        # Eliminar prefijos de ruta extendida \\?\ que a veces confunden a Python en modo EXE
+        clean_path = c.replace("\\\\?\\", "").replace("//?/", "")
+        final_candidates.append(os.path.normpath(clean_path))
+
+    for path in final_candidates:
         if os.path.exists(path) and os.path.isfile(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -119,7 +130,7 @@ def get_master_key() -> bytes:
                 continue
 
     raise RuntimeError(
-        f"No se encontró la llave maestra (master.key). Busqué en: {unique_candidates}. "
+        f"Error: No se encontró la llave maestra (master.key). Busqué en: {final_candidates}. "
         "Asegúrese de que el archivo existe en la carpeta 'data'."
     )
 
