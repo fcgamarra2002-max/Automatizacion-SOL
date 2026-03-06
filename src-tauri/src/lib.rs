@@ -15,11 +15,11 @@ fn export_backup(dest_path: String) -> Result<String, String> {
         .iter()
         .collect();
 
-    let db_file = db_dir.join("empresas.mdb");
+    let db_file = db_dir.join("empresas.db");
     let key_file = db_dir.join("master.key");
 
     if !db_file.exists() {
-        return Err("Error: La base de datos (empresas.mdb) no existe.".into());
+        return Err("Error: La base de datos (empresas.db) no existe.".into());
     }
 
     // Preparar el archivo ZIP de destino
@@ -33,8 +33,8 @@ fn export_backup(dest_path: String) -> Result<String, String> {
         .unix_permissions(0o755);
 
     // 1. Añadir la base de datos
-    zip.start_file("empresas.mdb", options)
-        .map_err(|e| format!("Error iniciando entrada ZIP para mdb: {}", e))?;
+    zip.start_file("empresas.db", options)
+        .map_err(|e| format!("Error iniciando entrada ZIP para db: {}", e))?;
 
     let mut f = File::open(&db_file).map_err(|e| format!("Error abriendo base de datos: {}", e))?;
     let mut buffer = Vec::new();
@@ -72,7 +72,7 @@ fn import_backup(src_path: String) -> Result<String, String> {
         .iter()
         .collect();
 
-    let db_file = db_dir.join("empresas.mdb");
+    let db_file = db_dir.join("empresas.db");
     let key_file = db_dir.join("master.key");
 
     // Abrir el archivo ZIP de origen
@@ -90,13 +90,13 @@ fn import_backup(src_path: String) -> Result<String, String> {
             .by_index(i)
             .map_err(|e| format!("Error accediendo a archivo interno del ZIP: {}", e))?;
 
-        // Extraer y sobrescribir mdb
-        if file.name() == "empresas.mdb" || file.name() == "empresas.accdb" {
+        // Extraer y sobrescribir db
+        if file.name() == "empresas.db" || file.name() == "empresas.mdb" || file.name() == "empresas.accdb" {
             let mut out = File::create(&db_file).map_err(|e| {
-                format!("Error al sobrescribir empresas.mdb (¿Archivo bloqueado?): {}", e)
+                format!("Error al sobrescribir empresas.db (¿Archivo bloqueado?): {}", e)
             })?;
             std::io::copy(&mut file, &mut out)
-                .map_err(|e| format!("Error extrayendo datos a empresas.mdb: {}", e))?;
+                .map_err(|e| format!("Error extrayendo datos a empresas.db: {}", e))?;
             found_db = true;
         }
 
@@ -131,15 +131,16 @@ pub fn run() {
         .setup(|app| {
             if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
                 let db_dir: PathBuf = [&local_app_data, "com.sunat.automation.v1", "data"].iter().collect();
-                let db_file = db_dir.join("empresas.mdb");
+                let db_file = db_dir.join("empresas.db");
                 
                 if !db_file.exists() {
                     let _ = std::fs::create_dir_all(&db_dir);
-                    if let Ok(resource_path) = app.path().resolve("data/plantilla.mdb", tauri::path::BaseDirectory::Resource) {
+                    // Intentar copiar plantilla .db si existe, si no db_setup la creará
+                    if let Ok(resource_path) = app.path().resolve("data/plantilla.db", tauri::path::BaseDirectory::Resource) {
                         if let Err(e) = std::fs::copy(&resource_path, &db_file) {
                             eprintln!("Error auto-generating blank database: {}", e);
                         } else {
-                            println!("Blank database (.mdb) successfully deployed to AppData for first-time use.");
+                            println!("Blank database (.db) successfully deployed to AppData for first-time use.");
                         }
                     }
                 }

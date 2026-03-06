@@ -1,74 +1,39 @@
 """
-CRUD para la tabla Empresas en MS Access.
+CRUD para la tabla Empresas en SQLite.
 
-SKILL: Conexión a MS Access desde Python con pyodbc.
-SKILL: Cadena de conexión, consultas SELECT/INSERT/UPDATE.
+SKILL: Conexión a SQLite desde Python con sqlite3.
+SKILL: Consultas SELECT/INSERT/UPDATE/DELETE.
 SKILL: Buenas prácticas — ClaveSOL se cifra/descifra con crypto.py.
 """
 
 import os
-import pyodbc
+import sqlite3
 import logging
 from models import Empresa
 from crypto import encrypt_clave, decrypt_clave
 
 logger = logging.getLogger(__name__)
 
-# Configuración de contraseña de la base de datos Access
-DB_PASSWORD = os.environ.get("SUNAT_DB_PASSWORD", "sunat_secure_2026")
-
 def get_connection(db_path: str):
-    """Establecer conexión con la DB MS Access buscando el controlador disponible."""
+    """Establecer conexión con la DB SQLite."""
     full_path = os.path.abspath(db_path)
     if not os.path.exists(full_path):
         logger.error(f"Base de datos no encontrada en: {full_path}")
         raise FileNotFoundError(f"No se encontró el archivo de base de datos en: {full_path}")
 
-    # Buscar controladores instalados que soporten Access
-    all_drivers = [d for d in pyodbc.drivers()]
-    # Para MDB usamos el driver estándar
-    target_driver = None
-    for d in all_drivers:
-        if "Microsoft Access Driver (*.mdb)" in d:
-            target_driver = d
-            break
-    
-    if not target_driver:
-        # Fallback genérico
-        for d in all_drivers:
-            if "Microsoft Access" in d:
-                target_driver = d
-                break
-
-    if not target_driver:
-        error_msg = (
-            "⚠️ ERROR DE CONTROLADOR ⚠️\n\n"
-            "No se encontró el controlador ODBC de Microsoft Access (para archivos .mdb).\n"
-            "Esto es inusual en Windows. Por favor contacte a soporte."
-        )
-        logger.error(error_msg)
-        raise pyodbc.Error("IM002", error_msg)
-
     try:
-        conn_str = (
-            f"DRIVER={{{target_driver}}};"
-            f"DBQ={full_path};"
-            f"PWD={DB_PASSWORD};"
-        )
-        logger.info(f"Conectando a MDB usando driver: {target_driver}")
-        return pyodbc.connect(conn_str, autocommit=True)
-    except pyodbc.Error as e:
-        logger.error(f"Error ODBC al conectar: {e}")
-        # Message extra si es el error de arquitectura
-        if "IM002" in str(e):
-            raise pyodbc.Error("IM002", "Driver no encontrado. Instale Microsoft Access Database Engine (x86).")
+        conn = sqlite3.connect(full_path)
+        # Habilitar retorno de filas accesibles por nombre
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Exception as e:
+        logger.error(f"Error al conectar con SQLite: {e}")
         raise
 
 
 def list_empresas(db_path: str) -> list[dict]:
     """
     Listar todas las empresas con ClaveSOL descifrada.
-    SKILL: SELECT exponiendo credenciales localmente (requerimiento del usuario).
     """
     conn = get_connection(db_path)
     try:
@@ -77,8 +42,8 @@ def list_empresas(db_path: str) -> list[dict]:
             "SELECT Id, RUC, RazonSocial, UsuarioSOL, ClaveSOL, Navegador, TipoPortal, Motor "
             "FROM Empresas ORDER BY RazonSocial"
         )
-        columns = [col[0] for col in cursor.description]
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        rows = [dict(row) for row in cursor.fetchall()]
         
         # Descifrar las claves para enviarlas al frontend
         for row in rows:
@@ -113,8 +78,7 @@ def get_empresa_for_login(db_path: str, empresa_id: int) -> dict:
         if not row:
             raise ValueError(f"Empresa con Id={empresa_id} no encontrada")
 
-        columns = [col[0] for col in cursor.description]
-        data = dict(zip(columns, row))
+        data = dict(row)
 
         # Descifrar ClaveSOL
         try:
@@ -135,7 +99,6 @@ def get_empresa_for_login(db_path: str, empresa_id: int) -> dict:
 def add_empresa(db_path: str, empresa_data: dict) -> dict:
     """
     Agregar una nueva empresa. La ClaveSOL se cifra antes de guardar.
-    SKILL: INSERT con pyodbc + cifrado Fernet.
     """
     empresa = Empresa.from_dict(empresa_data)
     errors = empresa.validate()
@@ -171,9 +134,8 @@ def add_empresa(db_path: str, empresa_data: dict) -> dict:
         )
         conn.commit()
 
-        # Obtener el Id generado
-        cursor.execute("SELECT @@IDENTITY")
-        new_id = cursor.fetchone()[0]
+        # Obtener el Id generado en SQLite
+        new_id = cursor.lastrowid
         logger.info(f"Empresa agregada: Id={new_id}, RUC={empresa.ruc}")
         return {"Id": new_id, "message": f"Empresa '{empresa.razon_social}' agregada exitosamente"}
     finally:
@@ -183,8 +145,6 @@ def add_empresa(db_path: str, empresa_data: dict) -> dict:
 def update_empresa(db_path: str, empresa_id: int, empresa_data: dict) -> dict:
     """
     Actualizar una empresa existente.
-    Si se proporciona nueva ClaveSOL, se recifra.
-    SKILL: UPDATE con pyodbc.
     """
     empresa = Empresa.from_dict(empresa_data)
     empresa.id = empresa_id
@@ -204,7 +164,6 @@ def update_empresa(db_path: str, empresa_id: int, empresa_data: dict) -> dict:
             raise ValueError(f"El RUC {empresa.ruc} ya está registrado en otra empresa.")
 
         # Si se proporciona nueva clave, cifrarla
-
         if empresa.clave_sol:
             clave_cifrada = encrypt_clave(empresa.clave_sol)
             cursor.execute(
@@ -247,7 +206,6 @@ def update_empresa(db_path: str, empresa_id: int, empresa_data: dict) -> dict:
 def delete_empresa(db_path: str, empresa_id: int) -> dict:
     """
     Eliminar una empresa por Id.
-    SKILL: DELETE con pyodbc.
     """
     conn = get_connection(db_path)
     try:

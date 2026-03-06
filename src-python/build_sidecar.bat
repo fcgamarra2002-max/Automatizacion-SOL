@@ -25,7 +25,6 @@ pyinstaller --onefile ^
     --name sunat-sidecar ^
     --collect-all selenium ^
     --collect-all playwright ^
-    --hidden-import=pyodbc ^
     --hidden-import=cryptography ^
     --hidden-import=webdriver_manager ^
     --hidden-import=db_access ^
@@ -45,10 +44,10 @@ echo [4/4] Copiando a src-tauri\binaries...
 copy /Y dist\sunat-sidecar.exe ..\src-tauri\binaries\sunat-sidecar-x86_64-pc-windows-msvc.exe
 
 echo.
-echo ✅ Sidecar compilado exitosamente (Versión Robusta).
+echo ✅ Sidecar compilado exitosamente (Versión Robusta SQLite).
 echo    Ubicación: src-tauri\binaries\sunat-sidecar-x86_64-pc-windows-msvc.exe
 echo.
 echo 💡 Para probar el sidecar directamente:
-echo    dist\sunat-sidecar.exe list-empresas --db ..\data\empresas.accdb
+echo    dist\sunat-sidecar.exe list-empresas --db ..\data\empresas.db
 echo.
 echo ✅ Build finished.

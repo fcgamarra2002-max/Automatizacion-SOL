@@ -1,5 +1,5 @@
 /**
- * tauriService.js — Comunicación con el sidecar Python via Tauri v2.
+ * tauriService.js — Comunicación con el sidecar Python via Tauri v2 (SQLite).
  * Reescrito para máxima robustez. 
  * 
  * IMPORTANTE: En Tauri v2, `stdout.on('data')` entrega datos LÍNEA POR LÍNEA,
@@ -7,11 +7,11 @@
  */
 
 import { Command } from "@tauri-apps/plugin-shell";
-import { exists, copyFile, mkdir, BaseDirectory } from "@tauri-apps/plugin-fs";
+import { exists, copyFile, mkdir } from "@tauri-apps/plugin-fs";
 import { appLocalDataDir, join, resolveResource } from "@tauri-apps/api/path";
 
 const SIDECAR = "binaries/sunat-sidecar";
-let DB_PATH = "data/empresas.mdb"; // Fallback inicial
+let DB_PATH = "data/empresas.db"; // Actualizado a SQLite
 let sidecarReady = false;
 
 // ── Estado global del servidor persistente ──
@@ -239,7 +239,7 @@ export async function initDatabase() {
         console.log("[db] Iniciando initDatabase...");
         const dataDir = await appLocalDataDir();
         const dbDir = await join(dataDir, "data");
-        const finalDbPath = await join(dbDir, "empresas.accdb");
+        const finalDbPath = await join(dbDir, "empresas.db");
         const masterKeyPath = await join(dbDir, "master.key");
 
         console.log("[db] AppData path:", finalDbPath);
@@ -250,12 +250,12 @@ export async function initDatabase() {
             await mkdir(dbDir, { recursive: true });
         }
 
-        // 2. Si la DB no existe, copiarla desde recursos
+        // 2. Si la DB no existe, intentar copiar desde recursos o dejar que el sidecar la cree
         if (!(await exists(finalDbPath))) {
             console.log("[db] DB no encontrada en AppData. Buscando en recursos...");
 
             let resourceDb = "";
-            const pathsToTry = ["data/empresas.accdb", "empresas.accdb", "_up_/data/empresas.accdb"];
+            const pathsToTry = ["data/empresas.db", "empresas.db", "_up_/data/empresas.db"];
 
             for (const p of pathsToTry) {
                 try {
@@ -264,31 +264,14 @@ export async function initDatabase() {
                         console.log(`[db] Recurso encontrado en (${p}):`, resourceDb);
                         break;
                     }
-                } catch (e) {
-                    console.warn(`[db] No se encontró el recurso en path: ${p}`);
-                }
+                } catch (e) { }
             }
 
-            if (!resourceDb) {
-                throw new Error("No se pudo localizar el recurso empresas.accdb en el paquete del instalador.");
-            }
-
-            await copyFile(resourceDb, finalDbPath);
-            console.log("[db] Copia de DB completada.");
-
-            // Copiar también la master.key si existe en recursos
-            try {
-                const resourceKey = await resolveResource("data/master.key");
-                await copyFile(resourceKey, masterKeyPath);
-                console.log("[db] Copia de master.key completada.");
-            } catch (e) {
-                try {
-                    const resourceKey = await resolveResource("master.key");
-                    await copyFile(resourceKey, masterKeyPath);
-                    console.log("[db] Copia de master.key completada (root).");
-                } catch (e2) {
-                    console.warn("[db] No se encontró master.key en recursos.");
-                }
+            if (resourceDb) {
+                await copyFile(resourceDb, finalDbPath);
+                console.log("[db] Copia de plantilla DB completada.");
+            } else {
+                console.log("[db] No se encontró plantilla, el sidecar creará una nueva DB.");
             }
         } else {
             console.log("[db] DB ya existe en AppData.");
@@ -303,8 +286,7 @@ export async function initDatabase() {
         return response;
     } catch (error) {
         console.error("[db] Error CRÍTICO en initDatabase:", error);
-        // Retornar error descriptivo para el UI
-        throw new Error(error.message || String(error));
+        throw error;
     }
 }
 
