@@ -312,14 +312,20 @@ async function setupDatabaseOneShot(path) {
         cmd.stderr.on("data", line => console.warn("[setup-db] stderr:", line));
 
         cmd.on("close", data => {
+            console.log(`[setup-db] Proceso cerrado con código ${data.code}. Output:`, output);
             if (data.code === 0) {
                 try {
-                    resolve(JSON.parse(output));
+                    const parsed = JSON.parse(output);
+                    if (parsed.success === false) {
+                        reject(new Error(parsed.message || "Fallo en setup_all"));
+                    } else {
+                        resolve(parsed);
+                    }
                 } catch (e) {
                     resolve({ success: true, message: "Setup finalizado (no-json output)" });
                 }
             } else {
-                reject(new Error(`Setup falló con código ${data.code}`));
+                reject(new Error(`Setup falló con código ${data.code}. Output: ${output}`));
             }
         });
 

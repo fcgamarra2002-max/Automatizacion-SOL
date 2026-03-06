@@ -171,8 +171,13 @@ def cmd_setup_db(args):
     """Subcomando: crear tabla y datos de prueba."""
     from db_setup import setup_all
     db = resolve_db_path(args.db)
-    setup_all(db)
-    resp = {"success": True, "message": "Base de datos configurada"}
+    success = setup_all(db)
+    
+    if success:
+        resp = {"success": True, "message": "Base de datos configurada exitosamente"}
+    else:
+        resp = {"success": False, "message": "Error al configurar la base de datos (ver logs para detalles)"}
+        
     if hasattr(args, 'request_id') and args.request_id:
         resp["request_id"] = args.request_id
     print(json.dumps(resp, ensure_ascii=False), flush=True)
