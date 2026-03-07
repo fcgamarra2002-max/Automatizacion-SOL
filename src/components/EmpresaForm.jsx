@@ -139,7 +139,8 @@ export default function EmpresaForm({ empresa, onClose, onSaved, setStatus }) {
 
   /* ── Cambios en inputs ── */
   function handleChange(e) {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    if (name === "UsuarioSOL") value = value.toUpperCase();
     setForm((prev) => ({ ...prev, [name]: value }));
     clearField(name);
 

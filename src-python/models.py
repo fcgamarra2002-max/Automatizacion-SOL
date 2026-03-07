@@ -26,7 +26,7 @@ class Empresa:
         self.id = id
         self.ruc = ruc
         self.razon_social = razon_social
-        self.usuario_sol = usuario_sol
+        self.usuario_sol = usuario_sol.upper()
         self.clave_sol = clave_sol
         self.navegador = navegador.lower()
         self.tipo_portal = tipo_portal.upper()
