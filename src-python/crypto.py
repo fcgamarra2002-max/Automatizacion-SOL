@@ -9,6 +9,7 @@ La clave maestra se almacena en variable de entorno SUNAT_MASTER_KEY.
 import os
 import sys
 import base64
+import tempfile
 from cryptography.fernet import Fernet
 
 # Ruta al archivo de clave maestra (en el directorio data/)
@@ -36,9 +37,27 @@ def save_key_to_file(filepath: str) -> str:
     Generar y guardar una clave maestra en un archivo.
     Retorna la clave generada.
     """
+    parent_dir = os.path.dirname(filepath)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
     key = generate_key()
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(key)
+    fd, temp_path = tempfile.mkstemp(
+        prefix="master-key-",
+        suffix=".tmp",
+        dir=parent_dir or None,
+        text=True,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(key)
+        os.replace(temp_path, filepath)
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
     return key
 
 
@@ -128,6 +147,17 @@ def get_master_key() -> bytes:
                         return IN_MEMORY_KEY
             except Exception:
                 continue
+
+    if _SEARCH_DIR_HINT:
+        auto_key_path = os.path.normpath(
+            os.path.join(_SEARCH_DIR_HINT.replace("\\\\?\\", "").replace("//?/", ""), "master.key")
+        )
+        try:
+            generated = save_key_to_file(auto_key_path)
+            IN_MEMORY_KEY = generated.encode()
+            return IN_MEMORY_KEY
+        except Exception:
+            pass
 
     raise RuntimeError(
         f"Error: No se encontró la llave maestra (master.key). Busqué en: {final_candidates}. "

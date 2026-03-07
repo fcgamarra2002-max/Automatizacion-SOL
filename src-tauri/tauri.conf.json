@@ -29,17 +29,17 @@
       "nsis"
     ],
     "licenseFile": "LICENSE.txt",
-    "windows": {
-      "nsis": {
-        "installMode": "currentUser",
-        "displayLanguageSelector": false,
-        "languages": [
-          "Spanish"
-        ],
-        "headerImage": "installer_banner.png",
-        "sidebarImage": "installer_banner.png"
-      }
-    },
+      "windows": {
+        "nsis": {
+          "installMode": "currentUser",
+          "displayLanguageSelector": false,
+          "languages": [
+            "Spanish"
+          ],
+          "headerImage": "installer_header_v2.bmp",
+          "sidebarImage": "installer_sidebar_v2.bmp"
+        }
+      },
     "resources": [
       "data"
     ],

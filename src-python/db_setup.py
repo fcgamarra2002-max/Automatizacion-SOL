@@ -17,6 +17,26 @@ logger = logging.getLogger(__name__)
 DATOS_PRUEBA = []
 
 
+def ensure_master_key(db_dir: str) -> bool:
+    """Crear la llave maestra si no existe, sin bloquear un primer arranque vacío."""
+    key_file = os.path.join(db_dir, "master.key")
+    if os.path.exists(key_file):
+        logger.info(f"Usando clave maestra existente en: {key_file}")
+        return True
+
+    try:
+        logger.info("Generando nueva llave maestra...")
+        save_key_to_file(key_file)
+        if not os.path.exists(key_file):
+            logger.error("No se pudo crear el archivo master.key")
+            return False
+        logger.info(f"Clave maestra generada exitosamente en: {key_file}")
+        return True
+    except Exception as e:
+        logger.warning(f"No se pudo crear master.key durante setup inicial: {e}")
+        return False
+
+
 def create_sqlite_db(db_path: str) -> bool:
     """Crea un nuevo archivo .db si no existe."""
     db_dir = os.path.dirname(db_path)
@@ -113,30 +133,21 @@ def insert_test_data(conn) -> bool:
 def setup_all(db_path: str):
     """Orquestador completo: DB -> Tablas -> Datos Prueba"""
     try:
-        # Asegurar que existe la carpeta
         db_path = os.path.abspath(db_path)
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
         
-        # Notificar a crypto dónde buscar la llave ANTES de proceder
         from crypto import set_key_search_dir
         if db_dir:
             set_key_search_dir(db_dir)
-            
-        key_file = os.path.join(db_dir, "master.key")
-        if not os.path.exists(key_file):
-            logger.info("Generando nueva llave maestra...")
-            save_key_to_file(key_file)
-            # Verificar que se creó
-            if not os.path.exists(key_file):
-                logger.error("No se pudo crear el archivo master.key")
-                return False
-            logger.info(f"Clave maestra generada exitosamente en: {key_file}")
-        else:
-            logger.info(f"Usando clave maestra existente en: {key_file}")
 
         if not create_sqlite_db(db_path):
+            return False
+
+        key_ready = ensure_master_key(db_dir) if db_dir else False
+        if DATOS_PRUEBA and not key_ready:
+            logger.error("No se puede insertar datos de prueba sin master.key")
             return False
             
         conn = get_db_connection(db_path)
@@ -148,7 +159,10 @@ def setup_all(db_path: str):
                 return False
             if not insert_test_data(conn):
                 return False
-                
+
+            if not key_ready:
+                logger.warning("Setup completado sin master.key; se creará bajo demanda al guardar credenciales.")
+
             logger.info("Setup de base de datos SQLite completado exitosamente.")
             return True
         finally:
@@ -162,6 +176,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # Cambiado por defecto a .db
     db = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-        os.path.dirname(__file__), "..", "data", "empresas.db"
+        os.path.dirname(__file__), "..", "data", "empresa.db"
     )
     setup_all(os.path.abspath(db))

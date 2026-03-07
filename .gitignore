@@ -30,7 +30,8 @@ nul
 keys.txt
 src-tauri/target
 src-tauri/gen
-src-tauri/data/
+src-tauri/data/*
+!src-tauri/data/plantilla.db
 src-python/python-x86/
 src-python/build/
 src-python/dist/

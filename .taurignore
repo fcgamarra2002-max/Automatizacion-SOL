@@ -1,6 +1,4 @@
-src-tauri/data/**
 src-tauri/data/.~lock*
 src-tauri/data/*.ldb
-src-tauri/data/plantilla.accdb
-src-tauri/data/empresas.accdb
+src-tauri/data/*.accdb
 src-tauri/data/master.key

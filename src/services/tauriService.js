@@ -8,11 +8,14 @@
 
 import { Command } from "@tauri-apps/plugin-shell";
 import { exists, copyFile, mkdir } from "@tauri-apps/plugin-fs";
-import { appLocalDataDir, join, resolveResource } from "@tauri-apps/api/path";
+import { invoke } from "@tauri-apps/api/core";
+import { resolveResource } from "@tauri-apps/api/path";
 
 const SIDECAR = "binaries/sunat-sidecar";
-let DB_PATH = "data/empresas.db"; // Actualizado a SQLite
+let DB_PATH = "data/empresa.db";
 let sidecarReady = false;
+let initDatabasePromise = null;
+let initDatabaseResult = null;
 
 // ── Estado global del servidor persistente ──
 const pending = new Map();
@@ -21,6 +24,43 @@ let server = null;
 // ── Verificar Tauri IPC ──
 function hasTauri() {
     return typeof window !== "undefined" && window.__TAURI_INTERNALS__;
+}
+
+async function getDatabasePaths() {
+    const [dbDir, finalDbPath, masterKeyPath] = await invoke("get_storage_paths");
+
+    return {
+        dbDir,
+        finalDbPath,
+        masterKeyPath,
+        cleanDbPath: finalDbPath.replace("\\\\?\\", "").replace("//?/", ""),
+    };
+}
+
+async function tryCopyBundledDb(finalDbPath) {
+    const pathsToTry = [
+        "data/empresa.db",
+        "data/empresas.db",
+        "data/plantilla.db",
+        "empresa.db",
+        "empresas.db",
+        "_up_/data/empresas.db",
+    ];
+
+    for (const resourcePath of pathsToTry) {
+        try {
+            const resolvedPath = await resolveResource(resourcePath);
+            if (resolvedPath && await exists(resolvedPath)) {
+                await copyFile(resolvedPath, finalDbPath);
+                console.log(`[db] Plantilla copiada desde recurso: ${resourcePath}`);
+                return true;
+            }
+        } catch (_) {
+            // Ignorar rutas faltantes y continuar con el siguiente fallback.
+        }
+    }
+
+    return false;
 }
 
 // ── Iniciar servidor persistente ──
@@ -234,44 +274,23 @@ export async function consultarRuc(ruc) {
  */
 export async function initDatabase() {
     if (!hasTauri()) return;
+    if (initDatabaseResult) return initDatabaseResult;
+    if (initDatabasePromise) return initDatabasePromise;
 
-    try {
+    initDatabasePromise = (async () => {
         console.log("[db] Iniciando initDatabase...");
-        const dataDir = await appLocalDataDir();
-        const dbDir = await join(dataDir, "data");
-        const finalDbPath = await join(dbDir, "empresas.db");
-
-        // Limpiar prefijos \\?\ que confunden a Python
-        const cleanDbPath = finalDbPath.replace("\\\\?\\", "").replace("//?/", "");
+        const { dbDir, finalDbPath, masterKeyPath, cleanDbPath } = await getDatabasePaths();
         console.log("[db] Path normalizado para Python:", cleanDbPath);
 
-        // 1. Asegurar que la carpeta existe
         if (!(await exists(dbDir))) {
             console.log("[db] Creando directorio:", dbDir);
             await mkdir(dbDir, { recursive: true });
         }
 
-        // 2. Si la DB no existe, intentar copiar desde recursos
         if (!(await exists(finalDbPath))) {
-            console.log("[db] DB no encontrada en AppData. Buscando en recursos...");
-
-            let resourceDb = "";
-            const pathsToTry = ["data/empresas.db", "empresas.db", "_up_/data/empresas.db"];
-
-            for (const p of pathsToTry) {
-                try {
-                    resourceDb = await resolveResource(p);
-                    if (await exists(resourceDb)) {
-                        console.log(`[db] Recurso encontrado en (${p}):`, resourceDb);
-                        break;
-                    }
-                } catch (e) { }
-            }
-
-            if (resourceDb) {
-                await copyFile(resourceDb, finalDbPath);
-                console.log("[db] Copia de plantilla DB completada.");
-            } else {
+            console.log("[db] DB no encontrada en AppData. Buscando plantilla...");
+            const copied = await tryCopyBundledDb(finalDbPath);
+            if (!copied) {
                 console.log("[db] No se encontró plantilla, el sidecar creará una nueva DB.");
             }
         } else {
@@ -280,23 +299,35 @@ export async function initDatabase() {
 
         DB_PATH = cleanDbPath;
 
-        // 3. Ejecutar el comando de setup del sidecar DE FORMA INDEPENDIENTE (one-shot)
-        // Usamos un comando nuevo para no interferir con el servidor persistente durante el boot
+        if (await exists(finalDbPath) && await exists(masterKeyPath)) {
+            console.log("[db] DB y master.key ya existen. Se omite setup inicial.");
+            initDatabaseResult = { success: true, path: cleanDbPath, reused: true };
+            return initDatabaseResult;
+        }
+
         console.log("[db] Ejecutando setupDatabase inicial (one-shot) en AppData...");
         const setupResult = await setupDatabaseOneShot(cleanDbPath);
         console.log("[db] Setup inicial completado:", setupResult);
 
-        // 4. Verificación final de persistencia
         if (!(await exists(finalDbPath))) {
             throw new Error(`Fallo crítico: La base de datos no se pudo crear en ${finalDbPath}`);
         }
 
+        if (!(await exists(masterKeyPath))) {
+            console.warn("[db] Setup completado sin master.key. Se creará al guardar credenciales.");
+        }
+
         console.log("[db] Inicialización exitosa y persistente en AppData.");
-        return { success: true };
-    } catch (error) {
+        initDatabaseResult = { success: true, path: cleanDbPath };
+        return initDatabaseResult;
+    })().catch((error) => {
         console.error("[db] Error CRÍTICO en initDatabase:", error);
         throw error;
-    }
+    }).finally(() => {
+        initDatabasePromise = null;
+    });
+
+    return initDatabasePromise;
 }
 
 /**
@@ -304,34 +335,70 @@ export async function initDatabase() {
  * Esto es más seguro durante el arranque que usar el servidor compartido.
  */
 async function setupDatabaseOneShot(path) {
-    return new Promise((resolve, reject) => {
-        const cmd = Command.sidecar(SIDECAR, ["setup-db", "--db", path]);
+    let lastError = null;
 
-        let output = "";
-        cmd.stdout.on("data", line => { output += line; });
-        cmd.stderr.on("data", line => console.warn("[setup-db] stderr:", line));
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+            return await new Promise((resolve, reject) => {
+                const cmd = Command.sidecar(SIDECAR, ["setup-db", "--db", path], {
+                    env: { PYTHONIOENCODING: "utf-8", PYTHONLEGACYWINDOWSSTDIO: "0" }
+                });
 
-        cmd.on("close", data => {
-            console.log(`[setup-db] Proceso cerrado con código ${data.code}. Output:`, output);
-            if (data.code === 0) {
-                try {
-                    const parsed = JSON.parse(output);
-                    if (parsed.success === false) {
-                        reject(new Error(parsed.message || "Fallo en setup_all"));
-                    } else {
-                        resolve(parsed);
+                const stdoutLines = [];
+                const stderrLines = [];
+
+                cmd.stdout.on("data", (line) => {
+                    const text = typeof line === "string" ? line.trim() : String(line).trim();
+                    if (text) stdoutLines.push(text);
+                });
+
+                cmd.stderr.on("data", (line) => {
+                    const text = typeof line === "string" ? line.trim() : String(line).trim();
+                    if (text) {
+                        stderrLines.push(text);
+                        console.warn("[setup-db] stderr:", text);
                     }
-                } catch (e) {
-                    resolve({ success: true, message: "Setup finalizado (no-json output)" });
-                }
-            } else {
-                reject(new Error(`Setup falló con código ${data.code}. Output: ${output}`));
-            }
-        });
+                });
 
-        cmd.on("error", error => reject(error));
-        cmd.spawn().catch(reject);
-    });
+                cmd.on("close", (data) => {
+                    console.log(`[setup-db] Intento ${attempt} cerrado con código ${data.code}.`);
+                    if (data.code !== 0) {
+                        reject(new Error(
+                            `Setup falló con código ${data.code}. ${stderrLines.join(" | ") || stdoutLines.join(" | ")}`
+                        ));
+                        return;
+                    }
+
+                    for (let i = stdoutLines.length - 1; i >= 0; i -= 1) {
+                        try {
+                            const parsed = JSON.parse(stdoutLines[i]);
+                            if (parsed.success === false) {
+                                reject(new Error(parsed.message || "Fallo en setup_all"));
+                            } else {
+                                resolve(parsed);
+                            }
+                            return;
+                        } catch (_) {
+                            // Continuar hasta encontrar la última línea JSON válida.
+                        }
+                    }
+
+                    resolve({ success: true, message: "Setup finalizado" });
+                });
+
+                cmd.on("error", (error) => reject(error));
+                cmd.spawn().catch(reject);
+            });
+        } catch (error) {
+            lastError = error;
+            console.warn(`[setup-db] Intento ${attempt} fallido:`, error);
+            if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+        }
+    }
+
+    throw lastError;
 }
 
 export async function setupDatabase() {

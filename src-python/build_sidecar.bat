@@ -11,17 +11,27 @@ echo.
 cd /d "%~dp0"
 
 REM Instalar dependencias
-echo [1/4] Instalando dependencias...
-pip install -r requirements.txt
-pip install pyinstaller pywin32
+echo [1/4] Verificando dependencias...
+where pyinstaller >nul 2>&1
+if errorlevel 1 (
+    echo PyInstaller no encontrado. Instalando dependencias de build...
+    pip install -r requirements.txt
+    pip install pyinstaller pywin32
+) else (
+    echo PyInstaller encontrado. Omitiendo reinstalacion de dependencias.
+)
 
-REM Instalar navegadores de Playwright
-echo [2/4] Instalando navegadores de Playwright...
-python -m playwright install chromium firefox
+REM Instalar navegadores de Playwright solo cuando se solicite explicitamente
+echo [2/4] Verificando navegadores de Playwright...
+if /I "%INSTALL_PLAYWRIGHT%"=="1" (
+    python -m playwright install chromium firefox
+) else (
+    echo Omitido. Use INSTALL_PLAYWRIGHT=1 para forzar la instalacion.
+)
 
 REM Compilar con PyInstaller
 echo [3/4] Compilando con PyInstaller...
-pyinstaller --onefile ^
+pyinstaller --noconfirm --clean --onefile ^
     --name sunat-sidecar ^
     --collect-all selenium ^
     --collect-all playwright ^
@@ -48,6 +58,6 @@ echo ✅ Sidecar compilado exitosamente (Versión Robusta SQLite).
 echo    Ubicación: src-tauri\binaries\sunat-sidecar-x86_64-pc-windows-msvc.exe
 echo.
 echo 💡 Para probar el sidecar directamente:
-echo    dist\sunat-sidecar.exe list-empresas --db ..\data\empresas.db
+echo    dist\sunat-sidecar.exe list-empresas --db ..\data\empresa.db
 echo.
 echo ✅ Build finished.
