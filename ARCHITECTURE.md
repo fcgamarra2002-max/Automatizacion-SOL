@@ -1,30 +1,56 @@
-# Arquitectura de Sunat-App
+# 🏗️ Arquitectura Técnica: Automatizacion-SOL
 
-Este documento es el mapa maestro del proyecto para asegurar que el desarrollo sea consistente.
+Este documento detalla la infraestructura y el flujo de datos del proyecto para asegurar la consistencia en el mantenimiento y escalabilidad.
 
-## Mapa de Componentes
+---
 
-### 1. Frontend (Vite + JavaScript)
-- `src/services/tauriService.js` -> Punto de entrada para llamadas al backend.
-- `src/components/` -> UI de la aplicación.
+## 🗺️ Mapa de Componentes
 
-### 2. Backend (Rust / Tauri)
-- `src-tauri/src/lib.rs` -> Gestión de comandos y orquestación del sidecar.
-- `src-tauri/tauri.conf.json` -> Configuración del sidecar y permisos de red.
+### 1. Capa de Presentación (Frontend)
+- **Tecnología**: React + Vite.
+- **Comunicación**: `src/services/tauriService.js` actúa como el broker de mensajes hacia el backend de Rust, gestionando la inicialización de la base de datos y las peticiones al servidor persistente de Python.
+- **Estado**: Gestión de estado local y caché en `localStorage` para una respuesta visual instantánea.
 
-### 3. Sidecar (Python 3.x)
-- `src-python/main.py` -> Entrypoint del proceso secundario.
-- `src-python/crypto.py` -> Gestión de claves SUNAT.
-- `src-python/db_access.py` -> Interfaz de la base de datos Access.
-- `src-python/sunat_playwright.py` -> Automatización de la web de SUNAT.
+### 2. Capa de Sistema (Backend Rust / Tauri)
+- **Fichero Principal**: `src-tauri/src/lib.rs`.
+- **Responsabilidades**:
+    - Orquestación de procesos sidecar.
+    - Operaciones de E/S de alto nivel (Backups ZIP, migraciones de archivos de sistema).
+    - Gestión de rutas persistentes en `AppData`.
+    - Registro de plugins (`shell`, `fs`, `dialog`).
 
-## Base de Datos
-- **Ruta**: Carpeta de datos de usuario o subdirectorio en `src-python`.
-- **Formato**: Microsoft Access (.mdb).
-- **Driver**: `Microsoft Access Driver (*.mdb)`.
+### 3. Capa de Lógica de Negocio (Sidecar Python)
+- **Fichero Principal**: `src-python/main.py`.
+- **Módulos Críticos**:
+    - `crypto.py`: Implementación del cifrado Fernet con búsqueda de llave distribuida y persistencia atómica.
+    - `db_access.py` / `db_setup.py`: Abstracción de acceso a **SQLite**.
+    - `ruc_api.py`: Cliente para la recuperación de datos públicos de SUNAT.
+    - `sunat_playwright.py` / `sunat_selenium.py`: Motores de automatización web.
 
-## Flujo de Trabajo
-1. El usuario inicia una acción en la UI.
-2. Rust invoca el proceso Python con los argumentos necesarios.
-3. Python realiza la tarea (ej. Consulta RUC o Login) y devuelve JSON.
-4. Rust parsea y envía al Frontend.
+---
+
+## 📋 Gestión de Persistencia
+
+La aplicación ha migrado de Microsoft Access a un esquema de **SQLite** altamente portátil.
+
+- **Nombre del Archivo**: `empresa.db`
+- **Ubicación Estándar**: `%LOCALAPPDATA%\Automatizacion-SOL\data\`
+- **Seguridad**: Los campos sensibles (`ClaveSOL`) se almacenan como blobs cifrados mediante Fernet (AES-128/256).
+
+### Flujo de Migración (Backward Compatibility)
+Al iniciar, el componente de Rust (`setup`) verifica la existencia de archivos antiguos en la carpeta legacy (`com.sunat.automation.v1`) y los migra al nuevo directorio estándar automáticamente para asegurar que el usuario no pierda información histórica.
+
+---
+
+## ⚙️ Ciclo de Vida de una Petición
+1. **Acción**: El usuario hace clic en "Login Portal" en la UI.
+2. **Broker**: `tauriService.js` envía el `Id` de la empresa y los parámetros al servidor de Python mediante `stdin`.
+3. **Lógica**: Python recupera el registro de la DB, desencripta la clave usando la `master.key` y arranca el navegador (Selenium/Playwright).
+4. **Respuesta**: Python devuelve un objeto JSON con el estado de la operación.
+5. **Feedback**: La UI se actualiza con el resultado de la automatización.
+
+---
+
+## 🛡️ Seguridad y Robustez
+- **Cierre del Sidecar**: El servidor de Python cuenta con un mecanismo de *timeout* y cierre automático si el proceso padre (Tauri) finaliza inesperadamente.
+- **Failsafe de DB**: Se realizan comprobaciones de integridad antes de realizar el backup e importación para prevenir la pérdida de datos.
